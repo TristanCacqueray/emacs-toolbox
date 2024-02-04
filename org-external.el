@@ -41,16 +41,15 @@
 ;;
 ;; EXTERNAL_REF: Once created, the external task is registered to this org task heading property.
 ;; This is used to add comment and close the task. Here are some example values:
-;;  - https://gitlab.com/REPO/issue/42
-;;  - https://github.com/OWNER/REPO/issue/42
-;;  - https://issues.redhat.com/browse/PROJ_NAME-42
+;;  - REPO#42
+;;  - PROJ_NAME-42
 ;;
 ;; Here are the list of available commands:
 ;;
-;; M-x org-external-create  - Create an external task and set the EXTERNAL_REF
-;; M-x org-external-comment - Show a comment buffer like a git commit and submit the result as an external comment
-;; M-x org-external-close   - Close the external task
-
+;; M-x org-external-push  - Push the heading at point to the external system
+;;
+;; Checkout the test for the expected document structure.
+;;
 ;;; Code:
 
 (require 'org)
@@ -77,12 +76,14 @@
   "Parse the org BODY content."
   (let*  ((props-end (when (s-starts-with? ":PROPERTIES:" body t) (s-index-of ":END:" body t)))
           (chop-props (if props-end (+ props-end 5) 0))
-          (body-without-props (s-chop-left chop-props body))
-          )
-    (s-trim (car (s-split "^\\*\\*" body-without-props)))))
+          (body-without-props (s-chop-left chop-props body)))
+    (s-trim
+     (s-replace-regexp "^SCHEDULE.*$" ""
+                       (s-replace-regexp "^CLOSED.*$" ""
+                                         (car (s-split "^\\*\\*" body-without-props)))))))
 
 (defun oe/get-body-contents (item)
-  "Return the contents of the ITEM until the next heading **."
+  "Return the contents of the ITEM until the next heading."
   (let* ((beg (org-element-property :contents-begin item))
          (end (org-element-property :contents-end item)))
     (oe/get-description (buffer-substring-no-properties beg end))))
@@ -101,10 +102,15 @@
   (if-let ((parent (org-element-property :EXTERNAL_REF (org-element-property :parent item))))
       (oe/parse-heading item parent)))
 
-(defun oe/push-comment (item)
-  "Push the given ITEM to the SYSTEM as a comment to the parent heading."
-  (message "comment: %s" item)
-  `(create-comment))
+(defun oe/parse-comment (item)
+  "Create the action body for a comment at ITEM."
+  (if-let ((parent (org-element-property :EXTERNAL_REF (org-element-property :parent item))))
+      (let* ((title (org-element-property :title item))
+             (ref (org-element-property :EXTERNAL_COMMENT item))
+             (desc (oe/get-body-contents item))
+             (body (if (s-blank? desc) title (format "%s.\n%s" title desc))))
+        (if ref (error "Comment already submitted") `(create-comment ,parent ,body)))
+    (error "Missing EXTERNAL_REF on parent to post comment")))
 
 (defun oe/push (item)
   "Return '(system action) or the ITEM."
@@ -112,7 +118,7 @@
            (level (org-element-property :level item)))
       (cons system
             (cond
-             ((= level 4) (oe/push-comment item))
+             ((= level 4) (oe/parse-comment item))
              ((= level 3) (oe/parse-task item))
              ((= level 2) (oe/parse-heading item nil))
              (t (error "Unknown heading"))))
@@ -163,6 +169,11 @@
        (let* ((url (format "https://%s/rest/api/2/issue/%s" host (cadr action)))
               (body (oe/jira-update-payload (caddr action))))
          (plz 'put url :headers headers :body body)))
+      ('create-comment
+       (let* ((url (format "https://%s/rest/api/2/issue/%s/comment" host (cadr action)))
+              (body (caddr action)))
+         (plz 'post url :headers headers :body (json-encode `(("body" . ,body))))
+         (org-set-property "EXTERNAL_COMMENT" "true")))
       (_ (error "Unknown action %s" action)))))
 
 ;;;###autoload

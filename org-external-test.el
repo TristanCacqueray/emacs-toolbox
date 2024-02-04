@@ -26,8 +26,10 @@
                                ""
                                "- Do x"
                                "- Do y"
-                               "*** DONE a task"
+                               "*** a task"
                                "Definition of done: merge X"
+                               "**** DONE looked into X"
+                               "CLOSED: [2024-01-11 Thu 15:57]"
                                )))
 
 (ert-deftest oe/test/push-story ()
@@ -99,6 +101,35 @@
     )
   )
 
+(ert-deftest oe/test/push-comment ()
+  (with-temp-buffer
+    (org-mode)
+    (insert oe/example)
+    (goto-char (point-min))
+    ;; Create goal and task
+    (search-forward "a goal")
+    (org-set-property "EXTERNAL_REF" "PROJ-42")
+    (search-forward "a task")
+    (org-set-property "EXTERNAL_REF" "PROJ-43")
+    (search-forward "looked into")
+    ;; Test the calculation
+    (should
+     (equal (oe/push (org-element-at-point))
+            (cons '(jira (:host "localhost" :token nil :proj "MY_PROJ"))
+                  '(create-comment "PROJ-43" "looked into X")
+                  )))
+    ;; The action should create the comment
+    (cl-letf (((symbol-function 'plz)
+               (lambda (verb url &rest e)
+                 (should (equal 'post verb))
+                 (should (string= "https://localhost/rest/api/2/issue/PROJ-43/comment" url))
+                 (should (string= "{\"body\":\"looked into X\"}" (plist-get e :body))))))
+      (org-external-push))
+    (should
+     (string= "true"
+              (org-element-property :EXTERNAL_COMMENT (org-element-at-point))))
+    )
+  )
 
 (ert-deftest oe/test/jira-parse-id ()
   (let ((resp (s-join "\n" (list
