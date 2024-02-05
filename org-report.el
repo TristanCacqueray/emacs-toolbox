@@ -50,6 +50,9 @@
   (or (org-entry-get (plist-get properties :org-marker) "ARCHIVE_CATEGORY")
       (org-entry-get (plist-get properties :org-marker) "CATEGORY")))
 
+(defun or/get-refs (item)
+  (org-entry-get (plist-get (cadr item) :org-marker) "EXTERNAL_REF" t))
+
 (defun or/daily-format-item (item)
   "Format 'org-ql-select' output. ITEM is a prop list."
   (let* ((properties (cadr item))
@@ -57,8 +60,9 @@
          (status (plist-get properties :todo-keyword))
          (status-str (if (string= status "DONE") "" (concat status ": ")))
          (category (or/get-cat properties))
-         )
-    (format "- %s - %s%s" (s-pad-left 9 " " category) status-str (or/remove-links title))))
+         (ref (or/get-refs item))
+         (ref-str (if ref (format "%s " ref) "")))
+    (format "- %s - %s%s%s" (s-pad-left 9 " " category) ref-str status-str (or/remove-links title))))
 
 (defun or/daily-format (items)
   "Format all ITEMS."
