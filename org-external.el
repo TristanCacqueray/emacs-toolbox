@@ -141,7 +141,7 @@
 (defun oe/jira-create-payload (project body)
   "Create the JSON-STR jira create payload from action PROJECT and BODY."
   (let* ((parent (plist-get body :parent))
-         (type (if parent "Sub-Task" "Story"))
+         (type (if parent "Sub-task" "Story"))
          (base `(project (key ,project)
                          summary ,(plist-get body :summary)
                          description ,(plist-get body :description)
@@ -162,7 +162,7 @@
     (pcase (car action)
       ('create
        (let* ((url (format "https://%s/rest/api/2/issue/" host))
-              (body (oe/jira-create-payload (plist-get system-info :project) (cadr action)))
+              (body (oe/jira-create-payload (plist-get system-info :proj) (cadr action)))
               (resp (plz 'post url :headers headers :body body :as 'string)))
          (oe/jira-parse-id resp)))
       ('update
