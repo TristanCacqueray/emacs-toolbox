@@ -39,8 +39,9 @@
   "The next meeting query."
   '(and (not (done)) (not (habit)) (scheduled :from ,(ts-now))))
 
-(defun one/format (item)
-  (let* ((properties (cadr item))
+(defun one/format (node)
+  (let* ((item (org-element-properties-resolve node 'force-undefer))
+         (properties (cadr item))
          (title (plist-get properties :raw-value))
          (scheduled (plist-get properties :scheduled))
          (ts (format-time-string "%FT%T%z" (org-timestamp-to-time scheduled))))

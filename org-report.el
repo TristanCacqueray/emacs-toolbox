@@ -53,9 +53,10 @@
 (defun or/get-refs (item)
   (org-entry-get (plist-get (cadr item) :org-marker) "EXTERNAL_REF" t))
 
-(defun or/daily-format-item (item)
+(defun or/daily-format-item (node)
   "Format 'org-ql-select' output. ITEM is a prop list."
-  (let* ((properties (cadr item))
+  (let* ((item (org-element-properties-resolve node 'force-undefer))
+         (properties (cadr item))
          (title (plist-get properties :raw-value))
          (status (plist-get properties :todo-keyword))
          (status-str (if (string= status "DONE") "" (concat status ": ")))
@@ -94,11 +95,12 @@ This is like org-ql--date< but considering closed date too."
                     (org-element-property :category ,item))))
     (string< (cat a) (cat b))))
 
-(defun or/monthly-format-item (acc item)
+(defun or/monthly-format-item (acc node)
   "Format an entry for the review.
 ACC is tuple of current content and category string.
 ITEM is an org entry."
-  (let* ((properties (cadr item))
+  (let* ((item (org-element-properties-resolve node 'force-undefer))
+         (properties (cadr item))
          (prev-cat (cadr acc))
          (content (car acc))
          (category (or/get-cat properties))
