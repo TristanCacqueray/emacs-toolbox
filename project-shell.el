@@ -52,33 +52,30 @@
   :group 'project-shell
   :type 'string)
 
-(defun project-shell-history-name ()
-  "Get the project root dir name and it's parent directory."
-  (let ((path (project-root (project-current))))
+(defun project-shell-history-name (proj)
+  "Get the PROJ history name by combining its name and its parent directory."
+  (let ((path (project-root proj)))
     (f-join (f-filename (f-dirname path)) (f-filename path))))
 
 (defun project-shell-history (&optional suffix)
-  (interactive)
   "Start a shell for the given project with a buffer named after SUFFIX."
-  (let* ((name (cond ((string= default-directory "~/") (getenv "USER"))
-		     ((string= default-directory "/home/fedora/") "fedora")
-		     (t (project-shell-history-name))))
-	 (histfile (expand-file-name (concat project-shell-history-dir (string-replace "/" "_" name))))
-	 (*buffer* (get-buffer-create (concat "*shell: " name (or suffix "") "*"))))
+  (interactive)
+  (let* ((proj (project-current))
+         (name (if proj (project-shell-history-name proj) (getenv "USER")))
+         (histfile (expand-file-name (concat project-shell-history-dir (string-replace "/" "_" name))))
+         (*buffer* (get-buffer-create (concat "*shell: " name (or suffix "") "*"))))
     (if (get-buffer-process *buffer*)
         (switch-to-buffer-other-window *buffer*)
       (with-environment-variables
-	  (("HISTFILE" histfile))
-	(mkdir project-shell-history-dir t)
-	(make-local-variable 'comint-input-ring-file-name)
-	(setq comint-input-ring-file-name histfile)
-	(when (f-file? histfile)
-	  (comint-read-input-ring t))
-	(setq comint-input-ring-file-name nil)
-	(if-let ((proj (project-current))
-		 (dir (project-root proj)))
-	    (cd dir))
-	(shell *buffer*)))))
+          (("HISTFILE" histfile))
+        (mkdir project-shell-history-dir t)
+        (make-local-variable 'comint-input-ring-file-name)
+        (setq comint-input-ring-file-name histfile)
+        (when (f-file? histfile)
+          (comint-read-input-ring t))
+        (setq comint-input-ring-file-name nil)
+        (when proj (cd (project-root proj)))
+        (shell *buffer*)))))
 
 (provide 'project-shell)
 ;;; project-shell.el ends here
