@@ -78,7 +78,8 @@
     (unless (f-git? d)
       (git-clone-url url d))
     ;; todo: check if clone process succeeded
-    (project--remember-dir d)
+    (when (fboundp 'project--remember-dir)
+      (project--remember-dir d))
     (dired d)))
 
 (provide 'git-clone)
