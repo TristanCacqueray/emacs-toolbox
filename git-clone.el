@@ -55,14 +55,16 @@
       '((" " . "")
         ("/r/" . "/")
         ("/git/" . "/")
+        ("/static/repos/git/" . "/")
         ("/gerrit/" . "/"))
       (replace-regexp-in-string
        "\\.git$" "" (url-filename inf))))))
 
+;; TODO: support shallow clone with `--depth 1 --shallow-submodules'
 (defun git-clone-url (url dir)
   "Call git clone URL DIR."
   (mkdir dir t)
-  (call-process "git" nil (get-buffer-create "*git-clone-log*") nil "clone" "--depth" "1" url dir))
+  (call-process "git" nil (get-buffer-create "*git-clone-log*") nil "clone" "--recurse-submodules" url dir))
 
 (defun f-git? (path)
   "Check if PATH is a git clone."
