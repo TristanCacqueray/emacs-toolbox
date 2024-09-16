@@ -60,11 +60,27 @@
       (replace-regexp-in-string
        "\\.git$" "" (url-filename inf))))))
 
+
 ;; TODO: support shallow clone with `--depth 1 --shallow-submodules'
 (defun git-clone-url (url dir)
   "Call git clone URL DIR."
   (mkdir dir t)
-  (call-process "git" nil (get-buffer-create "*git-clone-log*") nil "clone" "--recurse-submodules" url dir))
+  (let ((*buffer* (get-buffer-create "*git-clone-log*")))
+    (switch-to-buffer-other-window *buffer*)
+    (with-current-buffer *buffer*
+      (comint-mode))
+    (make-process
+     :name "git-clone"
+     :buffer "*git-clone-log*"
+     :command (list "git" "clone" "--recurse-submodules" url dir)
+     :filter 'comint-output-filter
+     :sentinel (lambda (_process event)
+                 (if (string= "finished\n" event)
+                     (progn
+                       (when (fboundp 'project--remember-dir)
+                         (project--remember-dir dir))
+                       (dired dir))
+                   (message "git clone died %s" event))))))
 
 (defun f-git? (path)
   "Check if PATH is a git clone."
@@ -75,12 +91,9 @@
   "Create directory, clone and open URL."
   (interactive "Murl: ")
   (let ((d (giturl-to-dir url)))
-    (unless (f-git? d)
-      (git-clone-url url d))
-    ;; todo: check if clone process succeeded
-    (when (fboundp 'project--remember-dir)
-      (project--remember-dir d))
-    (dired d)))
+    (if (f-git? d)
+        (dired d)
+      (git-clone-url url d))))
 
 (provide 'git-clone)
 ;;; git-clone.el ends here
