@@ -69,11 +69,13 @@
       (with-environment-variables
           (("HISTFILE" histfile))
         (mkdir project-shell-history-dir t)
-        (make-local-variable 'comint-input-ring-file-name)
-        (setq comint-input-ring-file-name histfile)
         (when (f-file? histfile)
-          (comint-read-input-ring t))
-        (setq comint-input-ring-file-name nil)
+          (with-current-buffer *buffer*
+            (comint-mode)
+            (make-local-variable 'comint-input-ring-file-name)
+            (setq comint-input-ring-file-name histfile)
+            (comint-read-input-ring t)
+            (setq comint-input-ring-file-name nil)))
         (when proj (cd (project-root proj)))
         (shell *buffer*)))))
 
