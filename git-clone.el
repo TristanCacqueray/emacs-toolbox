@@ -24,7 +24,7 @@
 ;; Keywords: git gerrit gitlab github
 ;; URL: https://github.com/TristanCacqueray/emacs-toolbox
 ;; License: GNU General Public License >= 3
-;; Package-Requires: ((emacs "29") (f "*"))
+;; Package-Requires: ((emacs "29"))
 
 ;;; Commentary:
 
@@ -32,11 +32,14 @@
 ;;
 ;;; Code:
 
-(require 'f)
+(require 'url-parse)
+(require 'comint)
 
-(setq git-clone-root-dir
-      (if (f-writable-p "/srv") "/srv/"
-        (concat (getenv "HOME") "/src/")))
+(defcustom git-clone-root-dir
+  (if (file-writable-p "/srv") "/srv/"
+    (concat (getenv "HOME") "/src/"))
+  "Base path for the `git-clone' command."
+  :type 'string :group 'magit)
 
 (defun giturl-to-dir (url)
   "Convert a git URL to a local path."
@@ -45,7 +48,9 @@
       (error "Invalid url: %s" url))
     (concat
      git-clone-root-dir
+     ;; the remote hostname
      (url-host inf)
+     ;; remove useless known url path
      (seq-reduce
       (lambda (string replacement-pair)
         (string-replace
@@ -57,42 +62,50 @@
         ("/git/" . "/")
         ("/static/repos/git/" . "/")
         ("/gerrit/" . "/"))
+      ;; remove trailing .git
       (replace-regexp-in-string
        "\\.git$" "" (url-filename inf))))))
 
-
-;; TODO: support shallow clone with `--depth 1 --shallow-submodules'
 (defun git-clone-url (url dir)
   "Call git clone URL DIR."
+  ;; ensure destination exists
   (mkdir dir t)
   (let ((*buffer* (get-buffer-create "*git-clone-log*")))
+    ;; show a new *git-clone-log* buffer
     (switch-to-buffer-other-window *buffer*)
     (with-current-buffer *buffer*
+      ;; activate comint-mode to handle terminal sequence
       (comint-mode))
     (make-process
      :name "git-clone"
      :buffer "*git-clone-log*"
-     :command (list "git" "clone" "--recurse-submodules" url dir)
+     :command (list "git" "clone" "--depth" "1" "--shallow-submodules" "--recurse-submodules" url dir)
+     ;; interpret the terminal sequence like \r
      :filter 'comint-output-filter
+     :coding 'utf-8
+     ;; sentinel is called when the process terminates
      :sentinel (lambda (_process event)
                  (if (string= "finished\n" event)
+                     ;; the clone succeeded
                      (progn
                        (when (fboundp 'project--remember-dir)
+                         ;; automitcally register the project to project.el
                          (project--remember-dir dir))
+                       ;; show the file listing
                        (dired dir))
+                   ;; todo: remove empty directory created
                    (message "git clone died %s" event))))))
 
 (defun f-git? (path)
   "Check if PATH is a git clone."
-  (f-directory? (concat path "/.git")))
+  (file-directory-p (concat path "/.git")))
 
 ;;;###autoload
 (defun git-clone (url)
   "Create directory, clone and open URL."
   (interactive "Murl: ")
   (let ((d (giturl-to-dir url)))
-    (if (f-git? d)
-        (dired d)
+    (if (f-git? d) (dired d)
       (git-clone-url url d))))
 
 (provide 'git-clone)
