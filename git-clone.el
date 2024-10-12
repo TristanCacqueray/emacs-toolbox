@@ -59,12 +59,15 @@
          string))
       '((" " . "")
         ("/r/" . "/")
-        ("/git/" . "/")
+        ("/code/" . "/")
+        ("/pub/scm/git/" . "/")
         ("/static/repos/git/" . "/")
+        ("/git/" . "/")
         ("/gerrit/" . "/"))
       ;; remove trailing .git
       (replace-regexp-in-string
-       "\\.git$" "" (url-filename inf))))))
+       "\\.git$" "" (url-filename inf)))
+     "/")))
 
 (defun git-clone-url (url dir)
   "Call git clone URL DIR."
@@ -87,12 +90,13 @@
      :sentinel (lambda (_process event)
                  (if (string= "finished\n" event)
                      ;; the clone succeeded
-                     (progn
-                       (when (fboundp 'project--remember-dir)
-                         ;; automitcally register the project to project.el
-                         (project--remember-dir dir))
-                       ;; show the file listing
-                       (dired dir))
+                     (if (fboundp 'project--remember-dir)
+                         (progn
+                           ;; automitcally register the project to project.el
+                           (project--remember-dir dir)
+                           ;; show the file listing
+                           (dired dir))
+                         (project-switch-project dir))
                    ;; todo: remove empty directory created
                    (message "git clone died %s" event))))))
 
